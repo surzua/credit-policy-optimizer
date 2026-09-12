@@ -26,7 +26,7 @@ def test_formula_breakeven_properties() -> None:
     amount = 10_000.0
     interest_rate = 0.20  # 20%
     cost_of_funds = 0.05  # 5%
-    lgd = 0.50            # 50%
+    lgd = 0.50  # 50%
     term_months = 12
 
     # Expected gain = 10000 * (0.20 - 0.05) * 1 = 1500
@@ -141,22 +141,23 @@ def test_optimal_policy_vs_arbitrary_05_baseline(sample_portfolio: pl.DataFrame)
     optimizer_sample = CreditPolicyOptimizer(sample_portfolio)
     result_sample = optimizer_sample.optimize_threshold()
     assert (
-        result_sample.optimal_policy.expected_pnl
-        >= result_sample.baseline_policy_05.expected_pnl
+        result_sample.optimal_policy.expected_pnl >= result_sample.baseline_policy_05.expected_pnl
     )
 
     # 2. Portfolio spanning full risk spectrum (PD from 1% to 60%), naive 0.5 causes heavy losses
     n = 1_000
     pds = np.linspace(0.01, 0.60, n)
     amounts = np.full(n, 10_000.0)
-    df_spectrum = pl.DataFrame({
-        "pd": pds,
-        "loan_amount": amounts,
-        "interest_rate": np.full(n, 0.18),
-        "cost_of_funds": np.full(n, 0.06),
-        "lgd": np.full(n, 0.45),
-        "loan_term_months": np.full(n, 12.0),
-    })
+    df_spectrum = pl.DataFrame(
+        {
+            "pd": pds,
+            "loan_amount": amounts,
+            "interest_rate": np.full(n, 0.18),
+            "cost_of_funds": np.full(n, 0.06),
+            "lgd": np.full(n, 0.45),
+            "loan_term_months": np.full(n, 12.0),
+        }
+    )
 
     optimizer_spectrum = CreditPolicyOptimizer(df_spectrum)
     result_spectrum = optimizer_spectrum.optimize_threshold()
@@ -251,7 +252,5 @@ def test_edge_cases() -> None:
         optimizer.evaluate_policy(-0.1)
 
     # Negative margin (interest rate <= cost of funds)
-    p_star_negative_margin = compute_breakeven_pd(
-        interest_rate=0.04, cost_of_funds=0.06, lgd=0.45
-    )
+    p_star_negative_margin = compute_breakeven_pd(interest_rate=0.04, cost_of_funds=0.06, lgd=0.45)
     assert p_star_negative_margin == 0.0

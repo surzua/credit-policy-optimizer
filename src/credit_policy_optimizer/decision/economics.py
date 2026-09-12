@@ -247,8 +247,10 @@ class CreditPolicyOptimizer:
         loss_expr = pl.col("loan_amount") * unit_loss
         ev_expr = ((1.0 - pl.col("pd")) * gain_expr) - (pl.col("pd") * loss_expr)
 
-        breakeven_expr = pl.when(unit_gain <= 0.0).then(0.0).otherwise(
-            (unit_gain / (unit_gain + unit_loss)).clip(0.0, 1.0)
+        breakeven_expr = (
+            pl.when(unit_gain <= 0.0)
+            .then(0.0)
+            .otherwise((unit_gain / (unit_gain + unit_loss)).clip(0.0, 1.0))
         )
 
         return df.with_columns(
@@ -372,11 +374,7 @@ class CreditPolicyOptimizer:
 
         for t in candidate_thresholds:
             pol_eval = self.evaluate_policy(float(t))
-            val = (
-                pol_eval.expected_pnl
-                if metric == "expected_pnl"
-                else pol_eval.return_on_exposure
-            )
+            val = pol_eval.expected_pnl if metric == "expected_pnl" else pol_eval.return_on_exposure
             if val > best_metric_value:
                 best_metric_value = val
                 best_threshold = float(t)
@@ -476,13 +474,11 @@ class CreditPolicyOptimizer:
 
         # Risk-based scaling factor
         safe_breakeven = (
-            pl.when(pl.col("breakeven_pd") > 0)
-            .then(pl.col("breakeven_pd"))
-            .otherwise(1.0)
+            pl.when(pl.col("breakeven_pd") > 0).then(pl.col("breakeven_pd")).otherwise(1.0)
         )
         scaling_expr = (1.0 - (pl.col("pd") / safe_breakeven)).clip(0.0, 1.0) ** risk_sensitivity
 
-        sized_amount_expr = (pl.col("loan_amount") * scaling_expr)
+        sized_amount_expr = pl.col("loan_amount") * scaling_expr
 
         # Only approve if EV > 0 and sized amount >= min_approval_amount
         df_sized = df.with_columns(
