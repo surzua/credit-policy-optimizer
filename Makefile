@@ -1,4 +1,4 @@
-.PHONY: help install lint format test data run-api clean
+.PHONY: help install lint format test data train run-api clean
 
 help:
 	@echo "Available commands:"
@@ -7,6 +7,7 @@ help:
 	@echo "  make format   - Automatically format code (ruff format & fix)"
 	@echo "  make test     - Run tests with coverage"
 	@echo "  make data     - Run data pipeline / initialize datasets"
+	@echo "  make train    - Train and calibrate risk model pipeline"
 	@echo "  make run-api  - Launch FastAPI dev server with reload"
 	@echo "  make clean    - Remove build and cache artifacts"
 
@@ -26,6 +27,9 @@ test:
 
 data:
 	uv run python -m credit_policy_optimizer.data
+
+train:
+	uv run python -m credit_policy_optimizer.models.train
 
 run-api:
 	uv run uvicorn credit_policy_optimizer.api:app --reload --host 0.0.0.0 --port 8000
