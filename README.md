@@ -57,23 +57,23 @@ $$
 EV_i = A_i \left[(1 - PD_i) \cdot (r_i - c)\left(\frac{T_i}{12}\right) - PD_i \cdot \left(\text{LGD} + c\frac{T_i}{12}\right)\right]
 $$
 
-#### 4. Umbral Crítico de Indiferencia / Breakeven ($p^*$)
+#### 4. Umbral Crítico de Indiferencia / Breakeven ($p^{\ast}$)
 El punto de equilibrio donde el valor esperado es exactamente cero ($EV = 0$):
 
 $$
-(1 - p^*) \cdot \text{UnitGain} = p^* \cdot \text{UnitLoss}
+(1 - p^{\ast}) \cdot \text{UnitGain} = p^{\ast} \cdot \text{UnitLoss}
 $$
 
 $$
-p^* = \frac{\text{UnitGain}}{\text{UnitGain} + \text{UnitLoss}} = \frac{(r_i - c)\frac{T_i}{12}}{(r_i - c)\frac{T_i}{12} + \text{LGD} + c\frac{T_i}{12}}
+p^{\ast} = \frac{\text{UnitGain}}{\text{UnitGain} + \text{UnitLoss}} = \frac{(r_i - c)\frac{T_i}{12}}{(r_i - c)\frac{T_i}{12} + \text{LGD} + c\frac{T_i}{12}}
 $$
 
 #### 5. Regla Óptima de Decisión
 
 $$
 \text{Decision}_i = \begin{cases} 
-\text{APROBADO} & \text{si } PD_i \le p^* \iff EV_i > 0 \\ 
-\text{RECHAZADO} & \text{si } PD_i > p^* \iff EV_i \le 0 
+\text{APROBADO} & \text{si } PD_i \le p^{\ast} \iff EV_i > 0 \\ 
+\text{RECHAZADO} & \text{si } PD_i > p^{\ast} \iff EV_i \le 0 
 \end{cases}
 $$
 
