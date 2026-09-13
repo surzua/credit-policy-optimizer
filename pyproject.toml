@@ -14,6 +14,7 @@ dependencies = [
     "numpy",
     "polars",
     "pydantic>=2.0",
+    "pyarrow",
     "scikit-learn",
     "scipy",
     "uvicorn",
@@ -27,6 +28,12 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
+notebooks = [
+    "ipykernel",
+    "matplotlib",
+    "pyarrow",
+    "seaborn",
+]
 
 [dependency-groups]
 dev = [
@@ -36,6 +43,12 @@ dev = [
     "pytest-cov",
     "ruff",
 ]
+notebooks = [
+    "ipykernel",
+    "matplotlib",
+    "pyarrow",
+    "seaborn",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -44,6 +57,7 @@ build-backend = "hatchling.build"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+exclude = ["scratch", "notebooks"]
 
 [tool.ruff.lint]
 select = [

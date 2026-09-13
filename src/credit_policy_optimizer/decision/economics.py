@@ -403,6 +403,87 @@ class CreditPolicyOptimizer:
             objective_metric=metric,
         )
 
+    def optimize_constrained_policy(
+        self,
+        grid_size: int = 500,
+        metric: Literal["expected_pnl", "return_on_exposure"] = "expected_pnl",
+        max_default_rate: float | None = None,
+        min_approval_rate: float | None = None,
+        max_expected_loss: float | None = None,
+    ) -> PolicyEvaluation:
+        """Find the optimal probability cutoff p* maximizing the objective under risk constraints.
+
+        Parameters
+        ----------
+        grid_size : int, default=500
+            Resolution of the candidate threshold search.
+        metric : Literal["expected_pnl", "return_on_exposure"]
+            Target financial metric to maximize.
+        max_default_rate : float | None
+            Maximum acceptable average default rate (bad rate) for the approved portfolio.
+        min_approval_rate : float | None
+            Minimum required approval share of the incoming portfolio.
+        max_expected_loss : float | None
+            Maximum allowable expected credit loss in USD.
+
+        Returns
+        -------
+        PolicyEvaluation
+            Optimal feasible policy evaluation satisfying all specified constraints.
+            If no candidate meets all constraints, returns the zero-approval fallback policy.
+        """
+        if grid_size < 10:
+            msg = f"grid_size must be at least 10, got {grid_size}"
+            raise ValueError(msg)
+
+        total_apps = self._enriched_portfolio.height
+        if total_apps == 0:
+            return self.evaluate_policy(0.0)
+
+        pds = self._enriched_portfolio["pd"].to_numpy()
+        grid_uniform = np.linspace(0.0, 1.0, grid_size)
+        grid_empirical = np.quantile(pds, np.linspace(0.0, 1.0, min(grid_size, len(pds))))
+        candidate_thresholds = np.unique(
+            np.clip(
+                np.concatenate(([0.0, 0.5, 1.0], grid_uniform, grid_empirical)),
+                0.0,
+                1.0,
+            )
+        )
+        candidate_thresholds.sort()
+
+        best_eval: PolicyEvaluation | None = None
+        best_metric_val = -float("inf")
+
+        for t in candidate_thresholds:
+            pol_eval = self.evaluate_policy(float(t))
+
+            # Feasibility checks
+            if max_default_rate is not None and pol_eval.approved_count > 0:
+                if pol_eval.expected_default_rate > max_default_rate:
+                    continue
+            if min_approval_rate is not None:
+                if pol_eval.approval_rate < min_approval_rate:
+                    continue
+            if max_expected_loss is not None:
+                if pol_eval.expected_loss > max_expected_loss:
+                    continue
+
+            val = (
+                pol_eval.expected_pnl
+                if metric == "expected_pnl"
+                else pol_eval.return_on_exposure
+            )
+            if val > best_metric_val:
+                best_metric_val = val
+                best_eval = pol_eval
+
+        # Fallback to zero approval policy if constraints are overly tight
+        if best_eval is None:
+            return self.evaluate_policy(0.0)
+
+        return best_eval
+
     def compute_tradeoff_curve(self, num_points: int = 100) -> pl.DataFrame:
         """Generate the full trade-off curve across probability thresholds.
 

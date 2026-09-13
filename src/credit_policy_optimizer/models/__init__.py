@@ -6,6 +6,8 @@ from credit_policy_optimizer.models.calibration import (
     ModelCalibrationMetrics,
     calibrate_pipeline,
     compute_expected_calibration_error,
+    compute_gini_coefficient,
+    compute_ks_statistic,
     evaluate_calibration,
 )
 from credit_policy_optimizer.models.pipeline import (
@@ -37,6 +39,8 @@ __all__ = [
     "build_preprocessor",
     "calibrate_pipeline",
     "compute_expected_calibration_error",
+    "compute_gini_coefficient",
+    "compute_ks_statistic",
     "evaluate_calibration",
     "load_pipeline",
     "load_pipeline_artifact",

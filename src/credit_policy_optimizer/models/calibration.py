@@ -7,7 +7,7 @@ from typing import Any, Literal
 import numpy as np
 import polars as pl
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import brier_score_loss, roc_auc_score
+from sklearn.metrics import brier_score_loss, roc_auc_score, roc_curve
 from sklearn.pipeline import Pipeline
 
 try:
@@ -325,3 +325,77 @@ def evaluate_calibration(
         ece_reduction_pct=round(ece_red_pct, 2),
         roc_auc_delta=round(roc_auc_delta, 6),
     )
+
+
+def compute_gini_coefficient(
+    y_true: np.ndarray | Sequence[int] | pl.Series,
+    y_prob: np.ndarray | Sequence[float] | pl.Series,
+) -> float:
+    """Compute the Gini coefficient (Somers' D) from ROC-AUC: Gini = 2 * AUC - 1.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Binary ground truth labels (0 or 1).
+    y_prob : array-like
+        Predicted probabilities of default (class 1).
+
+    Returns
+    -------
+    float
+        Gini coefficient bounded in [-1.0, 1.0]. Typically in [0.4, 0.85] for credit scorecards.
+    """
+    if isinstance(y_true, pl.Series):
+        y_true_arr = y_true.to_numpy()
+    else:
+        y_true_arr = np.asarray(y_true)
+
+    if isinstance(y_prob, pl.Series):
+        y_prob_arr = y_prob.to_numpy()
+    else:
+        y_prob_arr = np.asarray(y_prob)
+
+    auc = float(roc_auc_score(y_true_arr, y_prob_arr))
+    return float(2.0 * auc - 1.0)
+
+
+def compute_ks_statistic(
+    y_true: np.ndarray | Sequence[int] | pl.Series,
+    y_prob: np.ndarray | Sequence[float] | pl.Series,
+) -> tuple[float, float]:
+    """Compute the Kolmogorov-Smirnov (KS) statistic and its corresponding threshold.
+
+    Measures the maximum separation between cumulative bads (TPR) and cumulative goods (FPR):
+        KS = max(TPR - FPR)
+
+    Parameters
+    ----------
+    y_true : array-like
+        Binary ground truth labels (0 or 1).
+    y_prob : array-like
+        Predicted probabilities of default (class 1).
+
+    Returns
+    -------
+    tuple[float, float]
+        (ks_statistic, optimal_threshold)
+    """
+    if isinstance(y_true, pl.Series):
+        y_true_arr = y_true.to_numpy()
+    else:
+        y_true_arr = np.asarray(y_true)
+
+    if isinstance(y_prob, pl.Series):
+        y_prob_arr = y_prob.to_numpy()
+    else:
+        y_prob_arr = np.asarray(y_prob)
+
+    fpr, tpr, thresholds = roc_curve(y_true_arr, y_prob_arr)
+    ks_differences = tpr - fpr
+    max_idx = int(np.argmax(ks_differences))
+
+    ks_stat = float(ks_differences[max_idx])
+    ks_thresh = float(thresholds[max_idx])
+
+    return round(ks_stat, 4), round(ks_thresh, 4)
+

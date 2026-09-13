@@ -12,6 +12,8 @@ from credit_policy_optimizer.data.schema import CreditApplication
 from credit_policy_optimizer.models.calibration import (
     calibrate_pipeline,
     compute_expected_calibration_error,
+    compute_gini_coefficient,
+    compute_ks_statistic,
     evaluate_calibration,
 )
 from credit_policy_optimizer.models.pipeline import (
@@ -375,3 +377,22 @@ def test_invalid_calibration_method(fitted_models: dict[str, Any]) -> None:
             y_val=y_test,
             method="polynomial",  # type: ignore[arg-type]
         )
+
+
+def test_gini_and_ks_metrics() -> None:
+    """Verify calculation of Gini coefficient and KS statistic."""
+    y_true = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    y_prob = np.array([0.1, 0.2, 0.3, 0.4, 0.6, 0.7, 0.8, 0.9])
+
+    gini = compute_gini_coefficient(y_true, y_prob)
+    assert gini == pytest.approx(1.0, abs=1e-5)
+
+    ks_stat, ks_thresh = compute_ks_statistic(y_true, y_prob)
+    assert ks_stat == pytest.approx(1.0, abs=1e-5)
+    assert 0.4 <= ks_thresh <= 0.6
+
+    # Random guessing scenario: AUC ~ 0.5 -> Gini ~ 0.0
+    y_prob_random = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+    gini_random = compute_gini_coefficient(y_true, y_prob_random)
+    assert gini_random == pytest.approx(0.0, abs=1e-5)
+

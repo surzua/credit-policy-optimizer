@@ -254,3 +254,30 @@ def test_edge_cases() -> None:
     # Negative margin (interest rate <= cost of funds)
     p_star_negative_margin = compute_breakeven_pd(interest_rate=0.04, cost_of_funds=0.06, lgd=0.45)
     assert p_star_negative_margin == 0.0
+
+
+def test_optimize_constrained_policy(sample_portfolio: pl.DataFrame) -> None:
+    """Verify that constrained optimization respects default rate and approval caps."""
+    optimizer = CreditPolicyOptimizer(sample_portfolio)
+
+    # Tight default rate constraint
+    constrained_eval = optimizer.optimize_constrained_policy(
+        max_default_rate=0.05,
+        min_approval_rate=0.10,
+    )
+    if constrained_eval.approved_count > 0:
+        assert constrained_eval.expected_default_rate <= 0.05
+        assert constrained_eval.approval_rate >= 0.10
+
+    # Impossible constraint fallback scenario (max_default_rate = 0.0, min_approval_rate = 0.99)
+    impossible_eval = optimizer.optimize_constrained_policy(
+        max_default_rate=0.0001,
+        min_approval_rate=0.95,
+    )
+    assert impossible_eval.threshold == 0.0
+    assert impossible_eval.approved_count == 0
+
+    # Invalid grid_size error
+    with pytest.raises(ValueError, match="grid_size must be at least 10"):
+        optimizer.optimize_constrained_policy(grid_size=5)
+
