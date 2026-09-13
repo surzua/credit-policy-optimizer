@@ -15,14 +15,14 @@
 
 Los modelos tradicionales de Machine Learning en banca suelen evaluarse mediante métricas de clasificación estadística como **ROC-AUC**, **F1-Score** o **Accuracy**, empleando puntos de corte ingenuos como $p = 0.5$. En finanzas, este enfoque resulta subóptimo: **el costo de un falso positivo (otorgar un crédito que termina en default) suele ser un orden de magnitud superior al beneficio de un verdadero positivo (el margen financiero generado por un cliente cumplidor)**.
 
-El objetivo de **Credit Policy Optimizer** es alinear directamente la política de decisión con la **función de utilidad financiera** de la institución: maximizar el beneficio económico neto ($P\&L$) sujeto a restricciones de riesgo y liquidez.
+El objetivo de **Credit Policy Optimizer** es alinear directamente la política de decisión con la **función de utilidad financiera** de la institución: maximizar el beneficio económico neto (**P&L**) sujeto a restricciones de riesgo y liquidez.
 
 ### 1.1 Matriz de Costo / Beneficio en Originación
 
-| Decisión de Política | Cliente Cumplidor ($Y=0$) | Cliente en Impago ($Y=1$) |
+| Decisión de Política | Cliente Cumplidor ($Y = 0$) | Cliente en Impago ($Y = 1$) |
 | :--- | :--- | :--- |
-| **Aprobar Préstamo** | **Aprobado Bueno (True Negative)**<br>$\text{Beneficio} = +\text{Ganancia Neta por Intereses}$ | **Aprobado Malo (False Positive)**<br>$\text{Pérdida} = -\text{Pérdida de Capital (LGD + Costo Fondos)}$ |
-| **Rechazar Solicitud** | **Rechazo Erróneo (False Negative)**<br>$\text{Impacto} = -\text{Costo de Oportunidad (Margen Perdido)}$ | **Rechazo Acertado (True Positive)**<br>$\text{Pérdida Evitada} = \$0$ |
+| **Aprobar Préstamo** | **Aprobado Bueno (True Negative)**<br>• Beneficio: `+Ganancia Neta por Intereses` | **Aprobado Malo (False Positive)**<br>• Pérdida: `-(Pérdida de Capital LGD + Costo de Fondos)` |
+| **Rechazar Solicitud** | **Rechazo Erróneo (False Negative)**<br>• Impacto: `-Costo de Oportunidad (Margen Perdido)` | **Rechazo Acertado (True Positive)**<br>• Pérdida Evitada: `$0` |
 
 ---
 
@@ -32,29 +32,50 @@ Para cada solicitud $i$ con monto principal $A_i$, plazo en meses $T_i$, tasa de
 
 #### 1. Ganancia Neta en Cumplimiento ($\text{Gain}$)
 Es el ingreso neto financiero percibido si el acreditado paga puntualmente la totalidad de sus cuotas:
-$$\text{Gain}_i = A_i \times (r_i - c) \times \left(\frac{T_i}{12}\right)$$
+
+$$
+\text{Gain}_i = A_i \times (r_i - c) \times \left(\frac{T_i}{12}\right)
+$$
 
 #### 2. Pérdida Neta en Default ($\text{Loss}$)
 Es el quebranto financiero del principal no recuperado junto con el costo de fondeo incurrido durante el horizonte del crédito:
-$$\text{Loss}_i = A_i \times \left[\text{LGD} + c \times \left(\frac{T_i}{12}\right)\right]$$
+
+$$
+\text{Loss}_i = A_i \times \left[\text{LGD} + c \times \left(\frac{T_i}{12}\right)\right]
+$$
 
 #### 3. Valor Económico Esperado ($EV$)
 Combinando la probabilidad calibrada de default ($PD_i \in [0, 1]$):
-$$EV_i = (1 - PD_i) \times \text{Gain}_i - PD_i \times \text{Loss}_i$$
+
+$$
+EV_i = (1 - PD_i) \times \text{Gain}_i - PD_i \times \text{Loss}_i
+$$
 
 Expandiendo por unidad de monto financiado:
-$$EV_i = A_i \left[(1 - PD_i) \cdot (r_i - c)\left(\frac{T_i}{12}\right) - PD_i \cdot \left(\text{LGD} + c\frac{T_i}{12}\right)\right]$$
+
+$$
+EV_i = A_i \left[(1 - PD_i) \cdot (r_i - c)\left(\frac{T_i}{12}\right) - PD_i \cdot \left(\text{LGD} + c\frac{T_i}{12}\right)\right]
+$$
 
 #### 4. Umbral Crítico de Indiferencia / Breakeven ($p^*$)
 El punto de equilibrio donde el valor esperado es exactamente cero ($EV = 0$):
-$$(1 - p^*) \cdot \text{UnitGain} = p^* \cdot \text{UnitLoss}$$
-$$p^* = \frac{\text{UnitGain}}{\text{UnitGain} + \text{UnitLoss}} = \frac{(r_i - c)\frac{T_i}{12}}{(r_i - c)\frac{T_i}{12} + \text{LGD} + c\frac{T_i}{12}}$$
+
+$$
+(1 - p^*) \cdot \text{UnitGain} = p^* \cdot \text{UnitLoss}
+$$
+
+$$
+p^* = \frac{\text{UnitGain}}{\text{UnitGain} + \text{UnitLoss}} = \frac{(r_i - c)\frac{T_i}{12}}{(r_i - c)\frac{T_i}{12} + \text{LGD} + c\frac{T_i}{12}}
+$$
 
 #### 5. Regla Óptima de Decisión
-$$\text{Decisión}_i = \begin{cases} 
-\mathbf{APROBADO} & \text{si } PD_i \le p^* \iff EV_i > 0 \\ 
-\mathbf{RECHAZADO} & \text{si } PD_i > p^* \iff EV_i \le 0 
-\end{cases}$$
+
+$$
+\text{Decision}_i = \begin{cases} 
+\text{APROBADO} & \text{si } PD_i \le p^* \iff EV_i > 0 \\ 
+\text{RECHAZADO} & \text{si } PD_i > p^* \iff EV_i \le 0 
+\end{cases}
+$$
 
 ---
 
@@ -62,18 +83,18 @@ $$\text{Decisión}_i = \begin{cases}
 
 ```mermaid
 graph LR
-    A[Solicitante / Cartera] --> B[API FastAPI - Pydantic v2]
-    B --> C[Pipeline Preprocesamiento Scikit-Learn]
-    C --> D[LightGBM Classifier]
-    D --> E[Calibración Isotónica de Probabilidad]
-    E --> F[Motor Económico CreditPolicyOptimizer]
-    F --> G[Decisión Unitaria: APROBADO / RECHAZADO + EV + Factores Clave]
-    F --> H[Simulación de Portafolio: Curva P&L vs Umbral Óptimo p*]
+    A["Solicitante / Cartera"] --> B["API FastAPI (Pydantic v2)"]
+    B --> C["Pipeline Scikit-Learn"]
+    C --> D["LightGBM Classifier"]
+    D --> E["Calibración Isotónica"]
+    E --> F["Motor Económico CreditPolicyOptimizer"]
+    F --> G["Decisión Unitaria (EV y Factores Clave)"]
+    F --> H["Simulación Portafolio (Curva P&L y Umbral Óptimo)"]
 ```
 
 - **`data`**: Generador sintético con sesgos crediticios realistas, correlaciones de covarianza y exportación en Polars / Parquet.
 - **`models`**: Pipeline reproducible con `DataFrameAligner`, `FeatureEngineer`, `ColumnTransformer` y `LightGBM`. Calibración estricta post-entrenamiento (`CalibratedClassifierCV` con regresión isotónica) para garantizar que las probabilidades representen frecuencias empíricas de impago (minimizando el Brier Score y el ECE).
-- **`decision`**: Motor financiero `CreditPolicyOptimizer` que evalúa curvas de concesión, retornos sobre exposición ($ROE$) y búsqueda del umbral óptimo global.
+- **`decision`**: Motor financiero `CreditPolicyOptimizer` que evalúa curvas de concesión, retornos sobre exposición (ROE) y búsqueda del umbral óptimo global.
 - **`api`**: Servicio de entrega en producción con `FastAPI` y validación estricta con esquemas `Pydantic v2`.
 
 ---
