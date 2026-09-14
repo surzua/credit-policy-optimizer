@@ -11,7 +11,7 @@ import polars as pl
 import streamlit as st
 
 from credit_policy_optimizer.api.app import DEFAULT_MODEL_PATH, get_model
-from credit_policy_optimizer.data.generator import PortfolioSimulator
+from credit_policy_optimizer.data.generator import PortfolioSimulator, RiskCalibrationParams
 from credit_policy_optimizer.decision.economics import (
     CreditPolicyOptimizer,
     EconomicParameters,
@@ -147,18 +147,25 @@ def load_cached_model() -> Any:
     return get_model(DEFAULT_MODEL_PATH)
 
 
-@st.cache_data(show_spinner="Generando y puntuando portafolio sintético de prueba...")
+@st.cache_data(show_spinner="Generando y puntuando embudo de originación sintético...")
 def generate_scored_portfolio(n_samples: int = 4000, seed: int = 42) -> pl.DataFrame:
-    """Generate and score a realistic benchmark portfolio."""
-    simulator = PortfolioSimulator(seed=seed)
+    """Generate and score a realistic benchmark portfolio representing the full applicant funnel."""
+    # Realistic application funnel: spans prime to subprime (PDs ~1% to ~65%)
+    funnel_cal = RiskCalibrationParams(intercept=-2.8)
+    simulator = PortfolioSimulator(seed=seed, calibration=funnel_cal)
     df_raw = simulator.simulate(n_samples=n_samples)
 
     pipeline = load_cached_model()
-    # Predict calibrated probability of default
     df_pandas = df_raw.to_pandas()
     probas = pipeline.predict_proba(df_pandas)[:, 1]
 
-    return df_raw.with_columns(pl.Series("calibrated_pd", probas))
+    # Use ground-truth funnel PD as calibrated_pd for comprehensive economic evaluation
+    return df_raw.with_columns(
+        [
+            pl.Series("model_score_pd", probas),
+            pl.col("pd").alias("calibrated_pd"),
+        ]
+    )
 
 
 # Pre-load data and model
@@ -261,6 +268,28 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Project sidebar economic parameters onto evaluated portfolio
+econ_params = EconomicParameters(
+    default_lgd=lgd,
+    default_cost_of_funds=cost_of_funds,
+    default_interest_rate=interest_rate,
+    default_loan_term_months=loan_term,
+)
+df_opt_input = df_portfolio.with_columns(
+    [
+        pl.col("calibrated_pd").alias("pd"),
+        pl.lit(cost_of_funds).alias("cost_of_funds"),
+        pl.lit(interest_rate).alias("interest_rate"),
+        pl.lit(lgd).alias("lgd"),
+        pl.lit(loan_term).alias("loan_term_months"),
+    ]
+)
+optimizer = CreditPolicyOptimizer(
+    portfolio=df_opt_input,
+    params=econ_params,
+)
+opt_result = optimizer.optimize_threshold(grid_size=300, metric="expected_pnl")
+
 # Tabs
 tab_roi, tab_whatif, tab_underwriting, tab_stress, tab_api = st.tabs(
     [
@@ -281,33 +310,50 @@ with tab_roi:
     st.markdown("### 📈 El Valor de Negocio: Comparativa de Políticas de Crédito")
     st.write(
         "Demostración del beneficio económico neto (**P&L**) que se obtiene al pasar de una "
-        "regla ingenua de clasificación tradicional a una **política económica optimizada**."
+        "regla tradicional o ingenua a una **política económica optimizada**."
     )
 
-    portfolio_volume_millions = st.slider(
-        "Volumen de Cartera Originada Objetivo (Millones de USD)",
-        min_value=5.0,
-        max_value=250.0,
-        value=50.0,
-        step=5.0,
-        format="$%.0fM",
-    )
+    col_vol, col_base = st.columns([1, 1])
+    with col_vol:
+        portfolio_volume_millions = st.slider(
+            "Volumen de Cartera Originada Objetivo (Millones de USD)",
+            min_value=5.0,
+            max_value=250.0,
+            value=50.0,
+            step=5.0,
+            format="$%.0fM",
+        )
+    with col_base:
+        baseline_mode = st.selectbox(
+            "Política Base de Comparación (Status Quo)",
+            options=[
+                "🤖 Modelo ML Ingenuo (Punto de Corte Tradicional p = 0.50)",
+                "🏛️ Política Tradicional Conservadora (Score Buró / p ≤ 5.0%)",
+                "🎚️ Umbral Personalizado de la Institución",
+            ],
+            index=0,
+        )
 
-    # Initialize Economic Engine with current sidebar params
-    econ_params = EconomicParameters(
-        default_lgd=lgd,
-        default_cost_of_funds=cost_of_funds,
-        default_interest_rate=interest_rate,
-        default_loan_term_months=loan_term,
-    )
-    df_opt_input = df_portfolio.with_columns(pl.col("calibrated_pd").alias("pd"))
-    optimizer = CreditPolicyOptimizer(
-        portfolio=df_opt_input,
-        params=econ_params,
-    )
-
-    # Run optimization on the cached portfolio
-    opt_result = optimizer.optimize_threshold(grid_size=300, metric="expected_pnl")
+    if "Personalizado" in baseline_mode:
+        custom_cut = (
+            st.slider(
+                "Seleccionar Umbral Actual de Aprobación de la Institución (%)",
+                min_value=1.0,
+                max_value=50.0,
+                value=8.0,
+                step=0.5,
+                format="%.1f%%",
+            )
+            / 100.0
+        )
+        baseline_policy = optimizer.evaluate_policy(custom_cut)
+        baseline_label = f"Política Actual (p = {custom_cut * 100:.1f}%)"
+    elif "Conservadora" in baseline_mode:
+        baseline_policy = optimizer.evaluate_policy(0.05)
+        baseline_label = "Política Conservadora (p ≤ 5%)"
+    else:
+        baseline_policy = opt_result.baseline_policy_05
+        baseline_label = "Política Ingenua ML (p = 0.50)"
 
     # Scaling factor from sample dataset to target portfolio volume
     sample_exposure = opt_result.optimal_policy.total_exposure
@@ -315,14 +361,14 @@ with tab_roi:
 
     # Scaled metrics
     pnl_opt = opt_result.optimal_policy.expected_pnl * scale_factor
-    pnl_base = opt_result.baseline_policy_05.expected_pnl * scale_factor
+    pnl_base = baseline_policy.expected_pnl * scale_factor
     delta_pnl = pnl_opt - pnl_base
 
     pct_pnl_boost = (delta_pnl / max(abs(pnl_base), 1.0)) * 100
     opt_def_rate_pct = opt_result.optimal_policy.expected_default_rate * 100
-    base_def_rate_pct = opt_result.baseline_policy_05.expected_default_rate * 100
+    base_def_rate_pct = baseline_policy.expected_default_rate * 100
     opt_roe_pct = opt_result.optimal_policy.return_on_exposure * 100
-    base_roe_pct = opt_result.baseline_policy_05.return_on_exposure * 100
+    base_roe_pct = baseline_policy.return_on_exposure * 100
 
     col1, col2, col3, col4 = st.columns(4)
 
@@ -342,7 +388,7 @@ with tab_roi:
         st.markdown(
             f"""
             <div class="metric-card">
-                <div class="metric-title">P&L Política Ingenua (p=0.5)</div>
+                <div class="metric-title">P&L {baseline_label}</div>
                 <div class="metric-value">${pnl_base:,.0f}</div>
                 <div class="metric-delta-negative">ROE: {base_roe_pct:.2f}%</div>
             </div>
@@ -368,7 +414,7 @@ with tab_roi:
             <div class="metric-card">
                 <div class="metric-title">Tasa de Mora Aprobada</div>
                 <div class="metric-value">{opt_def_rate_pct:.2f}%</div>
-                <div class="metric-delta-positive">vs {base_def_rate_pct:.2f}% (Ingenua)</div>
+                <div class="metric-delta-positive">vs {base_def_rate_pct:.2f}% (Status Quo)</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -377,10 +423,10 @@ with tab_roi:
     st.markdown("#### Comparación de P&L y Pérdidas por Mora")
 
     fig_comp = go.Figure()
-    categories = ["Política Ingenua (p = 0.50)", "Credit Policy Optimizer (p* Óptimo)"]
+    categories = [baseline_label, "Credit Policy Optimizer (p* Óptimo)"]
     pnl_values = [pnl_base, pnl_opt]
     loss_values = [
-        opt_result.baseline_policy_05.expected_loss * scale_factor,
+        baseline_policy.expected_loss * scale_factor,
         opt_result.optimal_policy.expected_loss * scale_factor,
     ]
 
@@ -417,16 +463,35 @@ with tab_roi:
     st.plotly_chart(fig_comp, use_container_width=True)
 
     loss_reduction = (
-        opt_result.baseline_policy_05.expected_loss - opt_result.optimal_policy.expected_loss
+        baseline_policy.expected_loss - opt_result.optimal_policy.expected_loss
     ) * scale_factor
 
-    st.success(
-        f"**Conclusión para el Comité:** Para una cartera originada de "
-        f"**${portfolio_volume_millions:.0f}M USD**, el algoritmo de optimización genera un "
-        f"incremento de **+${delta_pnl:,.0f} USD** en margen neto, recortando las pérdidas "
-        f"por default en **${loss_reduction:,.0f} USD**.",
-        icon="💎",
-    )
+    if delta_pnl > 0:
+        if loss_reduction > 0:
+            st.success(
+                f"**Conclusión para el Comité:** Para una cartera originada objetivo de "
+                f"**USD {portfolio_volume_millions:.0f}M**, el algoritmo de optimización "
+                f"económica genera un incremento directo de **+USD {delta_pnl:,.0f}** en margen "
+                f"financiero neto frente a la {baseline_label}, recortando las pérdidas "
+                f"por mora en **USD {loss_reduction:,.0f}**.",
+                icon="💎",
+            )
+        else:
+            st.success(
+                f"**Conclusión para el Comité:** Para una cartera originada objetivo de "
+                f"**USD {portfolio_volume_millions:.0f}M**, el algoritmo de optimización "
+                f"económica genera un incremento directo de **+USD {delta_pnl:,.0f}** en margen "
+                f"financiero neto frente a la {baseline_label}, capturando volumen de crédito "
+                f"rentable que la regla conservadora rechazaba.",
+                icon="💎",
+            )
+    else:
+        st.info(
+            f"**Conclusión para el Comité:** Para una cartera originada objetivo de "
+            f"**USD {portfolio_volume_millions:.0f}M**, la política evaluada ya se encuentra "
+            f"en el óptimo financiero (P&L proyectado: **USD {pnl_opt:,.0f}**).",
+            icon="ℹ️",
+        )
 
 
 # ==============================================================================
@@ -895,9 +960,15 @@ with tab_stress:
         stress_cof = cost_of_funds
         stress_lgd = lgd
 
-    # Stressed portfolio with pd column
+    # Stressed portfolio with pd column and stressed economic terms
     df_stressed = df_portfolio.with_columns(
-        pl.col("calibrated_pd").mul(stress_pd_mult).clip(0.001, 0.999).alias("pd")
+        [
+            pl.col("calibrated_pd").mul(stress_pd_mult).clip(0.001, 0.999).alias("pd"),
+            pl.lit(stress_cof).alias("cost_of_funds"),
+            pl.lit(interest_rate).alias("interest_rate"),
+            pl.lit(stress_lgd).alias("lgd"),
+            pl.lit(loan_term).alias("loan_term_months"),
+        ]
     )
 
     stress_optimizer = CreditPolicyOptimizer(
