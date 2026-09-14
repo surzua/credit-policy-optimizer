@@ -750,12 +750,14 @@ dependencies = [
     { name = "lightgbm" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "plotly" },
     { name = "polars" },
     { name = "pyarrow" },
     { name = "pydantic" },
     { name = "scikit-learn" },
     { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "scipy", version = "1.18.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "streamlit" },
     { name = "uvicorn" },
 ]
 
@@ -806,6 +808,7 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'notebooks'" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "numpy" },
+    { name = "plotly", specifier = ">=5.20.0" },
     { name = "plotly", marker = "extra == 'ui'", specifier = ">=5.20.0" },
     { name = "polars" },
     { name = "pyarrow" },
@@ -817,6 +820,7 @@ requires-dist = [
     { name = "scikit-learn" },
     { name = "scipy" },
     { name = "seaborn", marker = "extra == 'notebooks'" },
+    { name = "streamlit", specifier = ">=1.35.0" },
     { name = "streamlit", marker = "extra == 'ui'", specifier = ">=1.35.0" },
     { name = "uvicorn" },
 ]

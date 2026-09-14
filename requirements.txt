@@ -1,0 +1,12 @@
+fastapi
+lightgbm
+numpy
+plotly>=5.20.0
+polars
+pydantic>=2.0
+pyarrow
+scikit-learn
+scipy
+streamlit>=1.35.0
+uvicorn
+joblib

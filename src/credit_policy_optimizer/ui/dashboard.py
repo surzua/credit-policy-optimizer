@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import logging
+import sys
+from pathlib import Path
 from typing import Any
 
-import numpy as np
-import plotly.graph_objects as go
-import polars as pl
-import streamlit as st
+# Ensure src directory is in sys.path for Streamlit Cloud deployments
+_SRC_DIR = Path(__file__).resolve().parents[2]
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
 
-from credit_policy_optimizer.api.app import DEFAULT_MODEL_PATH, get_model
-from credit_policy_optimizer.data.generator import PortfolioSimulator, RiskCalibrationParams
-from credit_policy_optimizer.decision.economics import (
+import numpy as np  # noqa: E402
+import plotly.graph_objects as go  # noqa: E402
+import polars as pl  # noqa: E402
+import streamlit as st  # noqa: E402
+
+from credit_policy_optimizer.api.app import DEFAULT_MODEL_PATH, get_model  # noqa: E402
+from credit_policy_optimizer.data.generator import (  # noqa: E402
+    PortfolioSimulator,
+    RiskCalibrationParams,
+)
+from credit_policy_optimizer.decision.economics import (  # noqa: E402
     CreditPolicyOptimizer,
     EconomicParameters,
     compute_breakeven_pd,

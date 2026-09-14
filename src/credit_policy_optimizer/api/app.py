@@ -23,7 +23,14 @@ from credit_policy_optimizer.models.train import run_training_pipeline
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_PATH = Path("models/credit_pipeline_calibrated.joblib")
+_DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_MODEL_REL_PATH = Path("models/credit_pipeline_calibrated.joblib")
+_MODEL_ROOT_FALLBACK = _DEFAULT_PROJECT_ROOT / _MODEL_REL_PATH
+DEFAULT_MODEL_PATH = (
+    _MODEL_ROOT_FALLBACK
+    if not _MODEL_REL_PATH.exists() and _MODEL_ROOT_FALLBACK.exists()
+    else _MODEL_REL_PATH
+)
 
 # Global singleton container for model caching
 _MODEL_PIPELINE: Any = None
@@ -34,6 +41,11 @@ def get_model(model_path: Path = DEFAULT_MODEL_PATH) -> Any:
     global _MODEL_PIPELINE
     if model_path == DEFAULT_MODEL_PATH and _MODEL_PIPELINE is not None:
         return _MODEL_PIPELINE
+
+    if not model_path.exists():
+        fallback_path = _DEFAULT_PROJECT_ROOT / model_path
+        if fallback_path.exists():
+            model_path = fallback_path
 
     if model_path.exists():
         logger.info("Loading calibrated model artifact from %s", model_path)
