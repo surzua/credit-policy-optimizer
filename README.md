@@ -5,6 +5,8 @@
 [![CI Quality Pipeline](https://github.com/surzua/credit-policy-optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/surzua/credit-policy-optimizer/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B.svg?logo=streamlit)](https://streamlit.io)
+[![Plotly](https://img.shields.io/badge/Plotly-5.20+-3F4F75.svg?logo=plotly)](https://plotly.com)
 [![Pydantic v2](https://img.shields.io/badge/Pydantic-v2.10+-E92063.svg?logo=pydantic)](https://docs.pydantic.dev/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: mypy](https://img.shields.io/badge/mypy-strict-blue.svg)](https://mypy-lang.org/)
@@ -125,6 +127,8 @@ El proyecto incluye un `Makefile` con los comandos estándar del ciclo de vida d
 | `make data` | Genera o inicializa los datasets sintéticos del portafolio. |
 | `make train` | Entrena y calibra el pipeline de riesgo y serializa el artefacto en `models/`. |
 | `make run-api` | Inicia el servidor de desarrollo de FastAPI con hot-reload en `http://0.0.0.0:8000`. |
+| `make run-ui` | Inicia la plataforma visual interactiva **Credit Policy Cockpit** (Streamlit + Plotly). |
+| `make dashboard` | Alias para `make run-ui`. |
 | `make clean` | Elimina archivos temporales de compilación, caché (`.pytest_cache`, `.mypy_cache`, `__pycache__`). |
 
 ---
@@ -139,12 +143,34 @@ make install
 make lint
 make test
 
-# 3. Iniciar el servicio API
+# 3. Iniciar el servicio API (Backend)
 make run-api
 ```
 
 La documentación interactiva OpenAPI (Swagger UI) queda disponible inmediatamente en:
 👉 **`http://localhost:8000/docs`**
+
+---
+
+### 3.4 Centro de Control Visual e Inteligencia de Decisión (Cockpit)
+
+Para explorar interactivamente la economía de la política crediticia y visualizar el impacto en P&L en tiempo real:
+
+```bash
+make run-ui
+# o también:
+make dashboard
+```
+
+El **Credit Policy Cockpit** queda disponible en:
+👉 **`http://localhost:8501`**
+
+#### Módulos de la Aplicación:
+1. **💼 Business ROI & Impacto**: Calculadora ejecutiva que compara el P&L generado frente a puntos de corte tradicionales ($p = 0.50$ o Score buró) en carteras de $10M a $250M USD.
+2. **🎛️ Policy Studio (What-If)**: Curvas interactivas de P&L y trade-offs de Aprobación vs. Morosidad reactivas a cambios en Costo de Fondos, LGD y Tasa Activa.
+3. **👤 Live Underwriting (Sandbox)**: Evaluación individual con Gauge de Riesgo calibrado, Waterfall de Utilidad Esperada ($EV$) y Factores de Decisión explicables.
+4. **🌪️ Stress Testing Macro**: Simulación de shocks adversos (Desaceleración, Shock Inflacionario, Crisis Severa) y ajuste adaptativo de la política.
+5. **🔌 Integración & Arquitectura**: Generador cURL y comprobador de salud en vivo del microservicio FastAPI.
 
 ---
 

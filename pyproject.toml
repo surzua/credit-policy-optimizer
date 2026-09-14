@@ -34,6 +34,10 @@ notebooks = [
     "pyarrow",
     "seaborn",
 ]
+ui = [
+    "plotly>=5.20.0",
+    "streamlit>=1.35.0",
+]
 
 [dependency-groups]
 dev = [
@@ -48,6 +52,10 @@ notebooks = [
     "matplotlib",
     "pyarrow",
     "seaborn",
+]
+ui = [
+    "plotly>=5.20.0",
+    "streamlit>=1.35.0",
 ]
 
 [build-system]
@@ -94,6 +102,8 @@ module = [
     "sklearn.*",
     "joblib.*",
     "lightgbm.*",
+    "streamlit.*",
+    "plotly.*",
 ]
 ignore_missing_imports = true
 disallow_subclassing_any = false
